@@ -55,7 +55,7 @@ class FaceClassifier(object):
     self.image_acquisition_rate = rospy.Rate(rospy.get_param("image_acquisition_rate",4))
 
     # hyper-parameters for bounding boxes shape
-    self.frame_window = rospy.get_param("~frame_window",10)
+    self.frame_window = rospy.get_param("~frame_window",1)
     self.gender_offsets = rospy.get_param("~gender_offsets",(30, 60))
     self.emotion_offsets = rospy.get_param("~emotion_offsets",(20, 40))
 
@@ -278,24 +278,33 @@ class FaceClassifier(object):
 
     #getting a list of detected faces in the gray image
     faces = detect_faces(self.face_detection, gray_image)
+    #rospy.loginfo("It was detect %d face(s)" %len(faces))
 
+    # arrays with all the faces detected and classified (gender and emotion) 
     genders=[]
     emotions=[]
     faces_classified=[]
-    #rospy.loginfo("It was detect %d face(s)" %len(faces))
+
+    # for each face analyse it and classify it
     for face_coordinates in faces:
 
+      #create a bigger bounding box where:
+      #   (x1,y1) is the top left corner
+      #   (x2,y2) is the bottom right corner
       x1, x2, y1, y2 = apply_offsets(face_coordinates, self.gender_offsets)
       rgb_face = rgb_image[y1:y2, x1:x2]
 
       x1, x2, y1, y2 = apply_offsets(face_coordinates, self.emotion_offsets)
       gray_face = gray_image[y1:y2, x1:x2]
+
+      # Resize the images to classify
       try:
         rgb_face = cv2.resize(rgb_face, (self.gender_target_size))
         gray_face = cv2.resize(gray_face, (self.emotion_target_size))
       except Exception as e:
         rospy.logwarn(e)
         continue
+
       gray_face = preprocess_input(gray_face, False)
       gray_face = np.expand_dims(gray_face, 0)
       gray_face = np.expand_dims(gray_face, -1)
@@ -315,8 +324,6 @@ class FaceClassifier(object):
         self.emotion_window.pop(0)
         self.gender_window.pop(0)
       
-      print(self.emotion_window)
-      print(self.gender_window)
       try:
         emotion_mode = mode(self.emotion_window)
         gender_mode = mode(self.gender_window)
