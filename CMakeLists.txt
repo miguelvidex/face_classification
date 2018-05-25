@@ -6,7 +6,7 @@ find_package(catkin REQUIRED COMPONENTS
   rospkg
   std_msgs
 	sensor_msgs
-	message_generation
+	message_generation #for msg
   cv_bridge
 )
 
@@ -25,6 +25,8 @@ add_service_files(
   face_classification_continuous.srv
 )
 
+catkin_python_setup()
+
 generate_messages(
   DEPENDENCIES 
   std_msgs
@@ -37,9 +39,11 @@ catkin_package(
   rospkg
   std_msgs
   sensor_msgs
-  message_generation
   message_runtime
   cv_bridge
+ DEPENDS
+  cv2
+  numpy
+  keras
+  statistics
 )
-
-catkin_python_setup()
