@@ -3,7 +3,6 @@ project(face_classification)
 
 find_package(catkin REQUIRED COMPONENTS
 	rospy
-  rospkg
   std_msgs
 	sensor_msgs
 	message_generation #for msg
@@ -36,14 +35,8 @@ generate_messages(
 catkin_package(
  CATKIN_DEPENDS
   rospy
-  rospkg
   std_msgs
   sensor_msgs
   message_runtime
   cv_bridge
- DEPENDS
-  cv2
-  numpy
-  keras
-  statistics
 )
