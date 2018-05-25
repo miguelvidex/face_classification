@@ -3,19 +3,19 @@ project(face_classification)
 
 find_package(catkin REQUIRED COMPONENTS
 	rospy
-  	std_msgs
+  rospkg
+  std_msgs
 	sensor_msgs
 	message_generation
+  cv_bridge
 )
-
-catkin_python_setup()
 
 ## Generate messages in the 'msg' folder
 add_message_files(
 	DIRECTORY ros/msg
 	FILES
-	face_classification_single.msg
-	face_classification_array.msg
+	FaceClassification.msg
+	FaceClassificationArray.msg
 )
 
 add_service_files(
@@ -33,5 +33,13 @@ generate_messages(
 
 catkin_package(
  CATKIN_DEPENDS
- message_runtime
+  rospy
+  rospkg
+  std_msgs
+  sensor_msgs
+  message_generation
+  message_runtime
+  cv_bridge
 )
+
+catkin_python_setup()

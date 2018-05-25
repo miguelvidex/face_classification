@@ -12,7 +12,7 @@ from keras.models import load_model
 from std_msgs.msg import String, Header
 from sensor_msgs.msg import Image, CompressedImage, RegionOfInterest
 from face_classification.srv import face_classification_buffered , face_classification_continuous
-from face_classification.msg import face_classification_single,face_classification_array
+from face_classification.msg import FaceClassification,FaceClassificationArray
 
 from utils.datasets import get_labels
 from utils.inference import detect_faces, load_detection_model, apply_offsets, draw_bounding_box, draw_text
@@ -55,7 +55,7 @@ class FaceClassifier(object):
     self.image_acquisition_rate = rospy.Rate(rospy.get_param("image_acquisition_rate",4))
 
     # hyper-parameters for bounding boxes shape
-    self.frame_window = rospy.get_param("~frame_window",1)
+    self.frame_window = rospy.get_param("~frame_window",10)
     self.gender_offsets = rospy.get_param("~gender_offsets",(30, 60))
     self.emotion_offsets = rospy.get_param("~emotion_offsets",(20, 40))
 
@@ -91,7 +91,7 @@ class FaceClassifier(object):
     self.image_subscriber = None
 
     # PUBLISHERS
-    self.publisher = rospy.Publisher("~face_classification_array" , face_classification_array ,queue_size=1)
+    self.publisher = rospy.Publisher("~faces_classified" , FaceClassificationArray ,queue_size=1)
     self.publisher_image = rospy.Publisher("~image_raw" , Image ,queue_size=1)
     self.publisher_image_compressed = rospy.Publisher("~image_raw/compressed" , CompressedImage ,queue_size=1)
 
@@ -195,13 +195,13 @@ class FaceClassifier(object):
     time_stamp = rospy.Time.now()
 
     # Array of detected faces
-    faces_array = face_classification_array()
+    faces_array = FaceClassificationArray()
     faces_array.header=Header()
     faces_array.header.stamp = time_stamp
 
     # for each face create the msg and add it to the face_array
     for idx_face, face_coordinates in enumerate(faces_coordinates):
-      new_face = face_classification_single()
+      new_face = FaceClassification()
       # face id equal to the number of face detected by default
       new_face.id=idx_face+1
       # face name by default
