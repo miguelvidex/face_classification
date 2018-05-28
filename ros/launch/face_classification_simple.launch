@@ -1,7 +1,6 @@
 <?xml version="1.0"?>
 <launch>
  
- <arg name="camera_type_is_depth" default="true"/>
  <arg name="camera_name" default="head_camera"/>
 
  <node pkg="face_classification" type="face_classification_node" name="face_classification_node" respawn="false" output="screen">

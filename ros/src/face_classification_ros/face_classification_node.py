@@ -355,6 +355,11 @@ class FaceClassifier(object):
     self.pub_msgs(cv2_img,faces_classified,genders,emotions)
 
     if self.mode == "buffer":
+      ################################################################
+      #
+      #  TODO  filtring(mode) the buffer of images and publish once
+      #
+      #################################################################
       self.buffer_size = self.buffer_size - 1
       if self.buffer_size == 0:
         self.image_subscriber.unregister()
