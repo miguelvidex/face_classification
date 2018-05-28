@@ -49,7 +49,7 @@ class BufferFrames(object):
     self.genders[key] = genders
     self.emotions[key] = emotions
 
-    rospy.loginfo(" This is the %d frame added with %s persons", self.counter[key], key)
+    rospy.logdebug(" This is the %d frame added with %s persons", self.counter[key], key)
     return
 
   def mode_frame(self):
@@ -202,6 +202,7 @@ class FaceClassifier(object):
     elif self.mode=="continuous" and not req.enable:
       self.image_subscriber.unregister()
       self.mode="idle"
+      rospy.loginfo('%s mode activated' % self.mode)
       self.is_new_image = False
       return True
 
@@ -312,7 +313,6 @@ class FaceClassifier(object):
 
     #getting a list of detected faces in the gray image
     faces = detect_faces(self.face_detection, gray_image)
-    #rospy.loginfo("It was detected %d face(s)" %len(faces))
 
     # arrays with all the faces detected and classified (gender and emotion) 
     genders=[]
@@ -383,6 +383,7 @@ class FaceClassifier(object):
         cv2_img,header,faces_classified,genders,emotions = self.buffer_frames.mode_frame()
         self.pub_msgs(cv2_img,header,faces_classified,genders,emotions)
         self.buffer_frames=None
+        rospy.loginfo('%s mode activated' % self.mode)
     
     else: #self.mode == "continuous"
 
@@ -400,6 +401,7 @@ class FaceClassifier(object):
         
         # if it's the first time that the the node is activated subscribe the topic and wait till the camera image stabilize
         if self.activate_mode:
+          rospy.loginfo('%s mode activated' % self.mode)
           self.image_subscriber = rospy.Subscriber(self.image_topic, self.image_type , self.image_subscriber_callback,  queue_size = 1)
           rospy.sleep(self.camera_delay)
           self.activate_mode=False
