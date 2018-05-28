@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from statistics import mode
+import operator
 import rospy
 import rospkg
 import os
@@ -19,6 +20,42 @@ from utils.inference import detect_faces, load_detection_model, apply_offsets, d
 from utils.preprocessor import preprocess_input
 
 from cv_bridge import CvBridge, CvBridgeError
+
+class BufferFrames(object):
+  
+  def __init__(self):
+
+    self.images = {}
+    self.headers = {}
+    self.faces_coordinates={}
+    self.genders = {}
+    self.emotions = {}
+
+    self.counter = {}
+
+  def add_frame(self,cv2_img,header,faces_classified,genders,emotions):
+    
+    # changing the key it's possible to change the mode criterion
+    key= len(faces_classified)
+
+    if key in self.counter:
+      self.counter[key] = self.counter[key] + 1 
+    else:
+      self.counter[key] = 1
+
+    self.images[key] = cv2_img
+    self.headers[key] = header
+    self.faces_coordinates[key] = faces_classified
+    self.genders[key] = genders
+    self.emotions[key] = emotions
+
+    #rospy.loginfo(" This is the %d frame added with %d persons", self.counter[key], key)
+    return
+
+  def mode_frame(self):
+    #mode
+    key = max(self.counter.iteritems(), key=operator.itemgetter(1))[0]
+    return self.images[key], self.headers[key], self.faces_coordinates[key], self.genders[key], self.emotions[key]
 
 class FaceClassifier(object):
 
@@ -54,10 +91,9 @@ class FaceClassifier(object):
     # Rate of the image acquisition in buffer mode
     self.image_acquisition_rate = rospy.Rate(rospy.get_param("image_acquisition_rate",4))
 
-    # hyper-parameters for bounding boxes shape
-    self.frame_window = rospy.get_param("~frame_window",10)
-    self.gender_offsets = rospy.get_param("~gender_offsets",(30, 60))
-    self.emotion_offsets = rospy.get_param("~emotion_offsets",(20, 40))
+    # percentage in [width,height] that the bounding box will be amplied 
+    self.gender_offsets_percentage = rospy.get_param("~gender_offsets_percentage",(20, 40))
+    self.emotion_offsets_percentage = rospy.get_param("~emotion_offsets_percentage",(20, 40))
 
     # get an instance of RosPack with the default search paths
     rospack = rospkg.RosPack()
@@ -110,9 +146,6 @@ class FaceClassifier(object):
     self.emotion_target_size = self.emotion_classifier.input_shape[1:3]
     self.gender_target_size = self.gender_classifier.input_shape[1:3]
 
-    # starting lists for calculating modes
-    self.gender_window = []
-    self.emotion_window = []
 
   ##############################################################################
   #                             CALLBACK FUNCTIONS
@@ -279,7 +312,7 @@ class FaceClassifier(object):
 
     #getting a list of detected faces in the gray image
     faces = detect_faces(self.face_detection, gray_image)
-    #rospy.loginfo("It was detect %d face(s)" %len(faces))
+    rospy.loginfo("It was detect %d face(s)" %len(faces))
 
     # arrays with all the faces detected and classified (gender and emotion) 
     genders=[]
@@ -292,10 +325,10 @@ class FaceClassifier(object):
       #create a bigger bounding box where:
       #   (x1,y1) is the top left corner
       #   (x2,y2) is the bottom right corner
-      x1, x2, y1, y2 = apply_offsets(face_coordinates, self.gender_offsets)
+      x1, x2, y1, y2 = apply_offsets(face_coordinates, self.gender_offsets_percentage)
       rgb_face = rgb_image[y1:y2, x1:x2]
 
-      x1, x2, y1, y2 = apply_offsets(face_coordinates, self.emotion_offsets)
+      x1, x2, y1, y2 = apply_offsets(face_coordinates, self.gender_offsets_percentage)
       gray_face = gray_image[y1:y2, x1:x2]
 
       # Resize the images to classify
@@ -311,7 +344,6 @@ class FaceClassifier(object):
       gray_face = np.expand_dims(gray_face, -1)
       emotion_label_arg = np.argmax(self.emotion_classifier.predict(gray_face))
       emotion_text = self.emotion_labels[emotion_label_arg]
-      self.emotion_window.append(emotion_text)
 
       rgb_face = np.expand_dims(rgb_face, 0)
       rgb_face = preprocess_input(rgb_face, False)
@@ -319,18 +351,6 @@ class FaceClassifier(object):
       gender_label_arg = np.argmax(gender_prediction)
       gender_text = self.gender_labels[gender_label_arg]
 
-      self.gender_window.append(gender_text)
-
-      if len(self.gender_window) > self.frame_window:
-        self.emotion_window.pop(0)
-        self.gender_window.pop(0)
-      
-      try:
-        emotion_mode = mode(self.emotion_window)
-        gender_mode = mode(self.gender_window)
-      except Exception as e:
-        rospy.logwarn(e)
-        continue
 
       if gender_text == self.gender_labels[0]:
         color = (0, 0, 255)
@@ -340,8 +360,8 @@ class FaceClassifier(object):
       # If no one is subscribing to the topics and the output image is to not be displayed, not even draw the bounding boxes
       if (self.publisher_image.get_num_connections() + self.publisher_image_compressed.get_num_connections()) > 0  or self.show_image:
         draw_bounding_box(face_coordinates, rgb_image, color)
-        draw_text(face_coordinates, rgb_image, gender_mode, color, 0, -20, 1, 1)
-        draw_text(face_coordinates, rgb_image, emotion_mode, color, 0, -45, 1, 1)
+        draw_text(face_coordinates, rgb_image, gender_text, color, 0, -20, 1, 1)
+        draw_text(face_coordinates, rgb_image, emotion_text, color, 0, -45, 1, 1)
 
       faces_classified.append(face_coordinates)
       genders.append(gender_text)
@@ -353,18 +373,20 @@ class FaceClassifier(object):
       cv2.imshow('window_frame', cv2_img)
       cv2.waitKey(3)
 
-    self.pub_msgs(cv2_img,self.last_image.header,faces_classified,genders,emotions)
-
     if self.mode == "buffer":
-      ################################################################
-      #
-      #  TODO  filtring(mode) the buffer of images and publish once
-      #
-      #################################################################
+      self.buffer_frames.add_frame(cv2_img,self.last_image.header,faces_classified,genders,emotions)
+
       self.buffer_size = self.buffer_size - 1
       if self.buffer_size == 0:
         self.image_subscriber.unregister()
         self.mode="idle"
+        cv2_img,header,faces_classified,genders,emotions = self.buffer_frames.mode_frame()
+        self.pub_msgs(cv2_img,header,faces_classified,genders,emotions)
+    
+    else: #self.mode == "continuous"
+
+      self.pub_msgs(cv2_img,self.last_image.header,faces_classified,genders,emotions)
+
     
     self.is_new_image=False
 
@@ -380,7 +402,8 @@ class FaceClassifier(object):
           self.image_subscriber = rospy.Subscriber(self.image_topic, self.image_type , self.image_subscriber_callback,  queue_size = 1)
           rospy.sleep(self.camera_delay)
           self.activate_mode=False
-        
+          if self.mode=="buffer":
+            self.buffer_frames= BufferFrames()
         #if there's new image it will be analysed
         if self.is_new_image:
           self.analyse_image()
