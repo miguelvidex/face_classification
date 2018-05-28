@@ -36,7 +36,7 @@ class BufferFrames(object):
   def add_frame(self,cv2_img,header,faces_classified,genders,emotions):
     
     # changing the key it's possible to change the mode criterion
-    key= len(faces_classified)
+    key = str(genders.count("woman"))+ "_"+ str(genders.count("man"))
 
     if key in self.counter:
       self.counter[key] = self.counter[key] + 1 
@@ -49,7 +49,7 @@ class BufferFrames(object):
     self.genders[key] = genders
     self.emotions[key] = emotions
 
-    #rospy.loginfo(" This is the %d frame added with %d persons", self.counter[key], key)
+    rospy.loginfo(" This is the %d frame added with %s persons", self.counter[key], key)
     return
 
   def mode_frame(self):
@@ -312,7 +312,7 @@ class FaceClassifier(object):
 
     #getting a list of detected faces in the gray image
     faces = detect_faces(self.face_detection, gray_image)
-    rospy.loginfo("It was detect %d face(s)" %len(faces))
+    #rospy.loginfo("It was detected %d face(s)" %len(faces))
 
     # arrays with all the faces detected and classified (gender and emotion) 
     genders=[]
@@ -382,6 +382,7 @@ class FaceClassifier(object):
         self.mode="idle"
         cv2_img,header,faces_classified,genders,emotions = self.buffer_frames.mode_frame()
         self.pub_msgs(cv2_img,header,faces_classified,genders,emotions)
+        self.buffer_frames=None
     
     else: #self.mode == "continuous"
 
