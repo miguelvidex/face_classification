@@ -9,9 +9,9 @@ import numpy as np
 from keras.models import load_model
 
 
-from std_msgs.msg import String, Header
+from std_msgs.msg import String
 from sensor_msgs.msg import Image, CompressedImage, RegionOfInterest
-from face_classification.srv import face_classification_buffered , face_classification_continuous
+from face_classification.srv import FaceClassificationBuffered , FaceClassificationContinuous
 from face_classification.msg import FaceClassification,FaceClassificationArray
 
 from utils.datasets import get_labels
@@ -60,12 +60,12 @@ class FaceClassifier(object):
     self.emotion_offsets = rospy.get_param("~emotion_offsets",(20, 40))
 
     # get an instance of RosPack with the default search paths
-    self.rospack = rospkg.RosPack()
+    rospack = rospkg.RosPack()
 
     # paths for loading data and images
-    detection_model_path =os.path.join(self.rospack.get_path('face_classification'),'trained_models','detection_models',detection_model)
-    emotion_model_path = os.path.join(self.rospack.get_path('face_classification'),'trained_models','emotion_models',emotion_model)
-    gender_model_path = os.path.join(self.rospack.get_path('face_classification'),'trained_models','gender_models', gender_model)
+    detection_model_path =os.path.join(rospack.get_path('face_classification'),'trained_models','detection_models',detection_model)
+    emotion_model_path = os.path.join(rospack.get_path('face_classification'),'trained_models','emotion_models',emotion_model)
+    gender_model_path = os.path.join(rospack.get_path('face_classification'),'trained_models','gender_models', gender_model)
     
     #labels of each dataset
     self.emotion_labels = get_labels(emotion_dataset)
@@ -84,8 +84,8 @@ class FaceClassifier(object):
     self.activate_mode = False
 
     # SERVICES
-    rospy.Service('face_classification_buffered', face_classification_buffered, self.face_classification_buffer_srv_callback)
-    rospy.Service('face_classification_continuous', face_classification_continuous, self.face_classification_continuously_srv_callback)
+    rospy.Service('face_classification_buffered', FaceClassificationBuffered, self.face_classification_buffer_srv_callback)
+    rospy.Service('face_classification_continuous', FaceClassificationContinuous, self.face_classification_continuously_srv_callback)
 
     # SUBSCRIBER
     self.image_subscriber = None
@@ -181,7 +181,7 @@ class FaceClassifier(object):
 
     
 
-  def pub_msgs(self,cv2_image,faces_coordinates,faces_genders,faces_emotions,image_format="passthrough"):
+  def pub_msgs(self,cv2_image,input_image_header,faces_coordinates,faces_genders,faces_emotions,image_format="passthrough"):
     '''
     Create the messages and publish it
       Arguments:
@@ -196,16 +196,17 @@ class FaceClassifier(object):
 
     # Array of detected faces
     faces_array = FaceClassificationArray()
-    faces_array.header=Header()
     faces_array.header.stamp = time_stamp
+    faces_array.image_input_header = input_image_header
+    
 
     # for each face create the msg and add it to the face_array
     for idx_face, face_coordinates in enumerate(faces_coordinates):
       new_face = FaceClassification()
       # face id equal to the number of face detected by default
-      new_face.id=idx_face+1
+      new_face.id=idx_face
       # face name by default
-      new_face.name="face"+ str(idx_face+1)
+      new_face.name="face"+ str(idx_face)
       new_face.gender=faces_genders[idx_face]
       new_face.emotion=faces_emotions[idx_face]
 
@@ -352,7 +353,7 @@ class FaceClassifier(object):
       cv2.imshow('window_frame', cv2_img)
       cv2.waitKey(3)
 
-    self.pub_msgs(cv2_img,faces_classified,genders,emotions)
+    self.pub_msgs(cv2_img,self.last_image.header,faces_classified,genders,emotions)
 
     if self.mode == "buffer":
       ################################################################
