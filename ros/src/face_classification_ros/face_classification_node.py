@@ -1,9 +1,5 @@
 #!/usr/bin/env python
 
-<<<<<<< HEAD
-from statistics import mode
-=======
->>>>>>> 9fef8d8c8fff896b37e929c032f0e3c16d46ec77
 import operator
 import rospy
 import rospkg
