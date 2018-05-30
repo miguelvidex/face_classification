@@ -70,4 +70,4 @@ With a few steps one can get its own face classification and detection running. 
 
 ## ROS USAGE
 
-* ---TODO---
+* In order to use this as a ROS package, consult [a relative link](ros/doc/README.md).
